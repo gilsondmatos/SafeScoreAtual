@@ -1,5 +1,7 @@
+# app/dashboard/app.py
 import os
 import json
+from uuid import uuid4
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
@@ -8,7 +10,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-# PDF (opcional, fallback simples)
+# PDF (opcional)
 try:
     from fpdf import FPDF  # type: ignore
 except Exception:
@@ -16,17 +18,22 @@ except Exception:
 
 DATA_DIR = Path("app/data")
 
-# ---- PROTEÇÃO: só configurar a página 1x por sessão e como 1º comando do Streamlit
+# --- set_page_config deve ser o primeiro comando do Streamlit
 if "_cfg_done" not in st.session_state:
-    try:
-        st.set_page_config(page_title="SafeScore — Dashboard", layout="wide")
-    finally:
-        st.session_state["_cfg_done"] = True
+    st.set_page_config(page_title="SafeScore — Dashboard", layout="wide")
+    st.session_state["_cfg_done"] = True
+
+# ---- keys únicas por sessão (evita conflito mesmo se o script renderizar mais de uma vez)
+if "_key_collect" not in st.session_state:
+    st.session_state["_key_collect"] = f"collect_{uuid4().hex}"
+if "_key_pdf" not in st.session_state:
+    st.session_state["_key_pdf"] = f"pdf_{uuid4().hex}"
+if "_key_pdf_dl" not in st.session_state:
+    st.session_state["_key_pdf_dl"] = f"pdf_dl_{uuid4().hex}"
 
 
 # ----------------- HELPERS -----------------
 def apply_secrets_to_env() -> None:
-    """Carrega st.secrets (Streamlit Cloud) para o ambiente, se ainda não existir."""
     try:
         for k, v in st.secrets.items():
             if isinstance(v, (dict, list)):
@@ -104,7 +111,7 @@ def contrib_table(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
-# ----------------- COLETA INLINE -----------------
+# ----------------- COLETA (ETH -> fallback mock) -----------------
 def _write_rows(path: Path, rows: List[Dict[str, Any]], header: List[str]) -> None:
     exists = path.exists()
     import csv
@@ -117,24 +124,22 @@ def _write_rows(path: Path, rows: List[Dict[str, Any]], header: List[str]) -> No
 
 
 def collect_and_score_now() -> int:
-    """Coleta dados (ETH -> fallback mock), pontua e grava CSVs. Retorna N processados."""
     apply_secrets_to_env()
     ensure_data_dir()
 
     txs: List[Dict[str, Any]] = []
     chain_label = os.getenv("CHAIN_NAME", "ETH")
 
-    # 1) tentar ETH
+    # tentar ETH
     try:
         import importlib
-        ec = importlib.import_module("app.collectors.eth_collector")  # sem streamlit
+        ec = importlib.import_module("app.collectors.eth_collector")
         txs = getattr(ec, "load_from_eth")(DATA_DIR)
     except Exception as e:
         st.warning(f"Coletor ETH falhou: {e}. Usando dados mock.")
-        # 2) fallback mock
         try:
             import importlib
-            mc = importlib.import_module("app.collectors.mock_collector")  # sem streamlit
+            mc = importlib.import_module("app.collectors.mock_collector")
             txs = getattr(mc, "load_input_or_mock")(DATA_DIR)
             chain_label = "MOCK"
         except Exception as e2:
@@ -144,7 +149,6 @@ def collect_and_score_now() -> int:
     if not txs:
         return 0
 
-    # 3) scoring
     from app.engine.scoring import ScoreEngine
     prev_path = DATA_DIR / "transactions.csv"
     prev = []
@@ -186,7 +190,6 @@ def collect_and_score_now() -> int:
     suf = chain_label.lower()
     _write_rows(DATA_DIR / f"transactions_{suf}.csv", out_rows, header)
     _write_rows(DATA_DIR / f"transactions_{suf}_{datetime.now().strftime('%Y%m%d')}.csv", out_rows, header)
-
     return len(out_rows)
 
 
@@ -202,23 +205,18 @@ def _pdf_from_rows(rows: pd.DataFrame, threshold: int, context_title: str) -> by
 
     pdf.set_font("Arial", "", 11)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pdf.ln(2)
     pdf.multi_cell(0, 6, f"Data de geracao: {now}")
     pdf.multi_cell(0, 6, f"Contexto: {context_title}")
     pdf.multi_cell(0, 6, f"Limiar de alerta: score < {threshold}")
     pdf.multi_cell(0, 6, f"Total de criticos: {len(rows)}")
     pdf.ln(4)
 
-    if len(rows) == 0:
-        pdf.set_font("Arial", "I", 11)
-        pdf.multi_cell(0, 6, "Nenhuma transacao critica encontrada no periodo.")
-    else:
+    if len(rows) > 0:
         pdf.set_font("Arial", "B", 11)
         pdf.cell(35, 8, "TX", border=1)
         pdf.cell(20, 8, "Score", border=1)
         pdf.cell(60, 8, "From", border=1)
         pdf.cell(60, 8, "To", border=1, ln=True)
-
         pdf.set_font("Arial", "", 10)
         for _, r in rows.iterrows():
             tx = str(r.get("tx_id", ""))[:18]
@@ -236,8 +234,7 @@ def _pdf_from_rows(rows: pd.DataFrame, threshold: int, context_title: str) -> by
     except PermissionError:
         out_path = DATA_DIR / f"relatorio_dashboard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         pdf.output(str(out_path))
-    with open(out_path, "rb") as fh:
-        return fh.read()
+    return out_path.read_bytes()
 
 
 def generate_pdf_bytes(df_source: pd.DataFrame, threshold: int, context_title: str) -> bytes:
@@ -251,30 +248,30 @@ def generate_pdf_bytes(df_source: pd.DataFrame, threshold: int, context_title: s
         return _pdf_from_rows(df_source, threshold, context_title)
 
 
-# ----------------- UI (FUNCIONAL) -----------------
+# ----------------- UI -----------------
 apply_secrets_to_env()
 ensure_data_dir()
 
 st.title("SafeScore — Dashboard")
-col_a, col_b = st.columns([4, 1])
-with col_a:
-    st.caption(f"Diretório de dados: {DATA_DIR.resolve()}")
-with col_b:
-    if st.button("⚡ Coletar agora (ETH)", key="collect_main"):
-        with st.spinner("Coletando e pontuando..."):
-            n = collect_and_score_now()
-        if n > 0:
-            st.success(f"Coleta concluída: {n} transações.")
-            st.rerun()
-        else:
-            st.error("Não foi possível coletar dados. Verifique ETH_RPC_URL e limites do RPC.")
+st.caption(f"Diretório de dados: {DATA_DIR.resolve()}")
+
+# Botão único de coleta na sidebar, com key única
+st.sidebar.header("Ações")
+if st.sidebar.button("⚡ Coletar agora (ETH)", key=st.session_state["_key_collect"]):
+    with st.spinner("Coletando e pontuando..."):
+        n = collect_and_score_now()
+    if n > 0:
+        st.success(f"Coleta concluída: {n} transações.")
+        st.rerun()
+    else:
+        st.error("Não foi possível coletar dados. Verifique ETH_RPC_URL e limites do RPC.")
 
 files = list_csvs()
 if not files:
-    st.info("Nenhum CSV encontrado em app/data. Use o botão acima ou rode `python main.py` localmente.")
+    st.info("Nenhum CSV encontrado em app/data. Use o botão na barra lateral ou rode `python main.py` localmente.")
     st.stop()
 
-# --------- Filtros (sidebar) ---------
+# --------- Filtros ---------
 st.sidebar.header("Filtros")
 default_file = pick_default_csv(files)
 fname = st.sidebar.selectbox("Arquivo de transações", files, index=files.index(default_file) if default_file in files else 0)
@@ -322,13 +319,16 @@ with cols[2]:
 st.subheader("Relatório (PDF)")
 alert_input = st.number_input("Limiar de alerta (score < x)", min_value=0, max_value=100, value=t_env)
 use_filters = st.checkbox("Usar filtros atuais no PDF", value=True)
-if st.button("Gerar PDF de críticos", key="pdf_button"):
+if st.button("Gerar PDF de críticos", key=st.session_state["_key_pdf"]):
     base_df = df if use_filters else (df_all[df_all["chain"] == chain] if "chain" in df_all.columns else df_all)
     crit = base_df[base_df["score"] < alert_input].copy()
     try:
         pdf_bytes = generate_pdf_bytes(crit, alert_input, f"{fname} | chain={chain} | filtros={'on' if use_filters else 'off'}")
         st.success("PDF gerado. Use o botão abaixo para baixar.")
-        st.download_button("Baixar PDF", data=pdf_bytes, file_name="relatorio_criticos.pdf", mime="application/pdf")
+        st.download_button(
+            "Baixar PDF", data=pdf_bytes, file_name="relatorio_criticos.pdf",
+            mime="application/pdf", key=st.session_state["_key_pdf_dl"]
+        )
     except Exception as e:
         st.error(f"Falha ao gerar PDF: {e}")
 

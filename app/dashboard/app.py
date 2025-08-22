@@ -23,7 +23,6 @@ if not st.session_state.get("_page_cfg_set"):
     try:
         st.set_page_config(page_title="SafeScore Dashboard", layout="wide")
     except Exception:
-        # Em caso de re-import acidental, ignore
         pass
     st.session_state["_page_cfg_set"] = True
 
@@ -299,7 +298,8 @@ ensure_data_dir()
 files = list_csvs()
 if not files:
     st.warning("Nenhum CSV encontrado em app/data.")
-    if st.button("⚡ Coletar agora (ETH)"):
+    # >>> chave única para o botão superior
+    if st.button("⚡ Coletar agora (ETH)", key="collect_top"):
         with st.spinner("Coletando on-chain e gerando CSVs..."):
             n = collect_and_score_now()
         if n > 0:
@@ -365,7 +365,8 @@ with ac1:
 with ac2:
     use_filters = st.checkbox("Gerar PDF usando filtros atuais", value=True)
 with ac3:
-    if st.button("⚡ Coletar agora (ETH)"):
+    # >>> chave única diferente do botão superior
+    if st.button("⚡ Coletar agora (ETH)", key="collect_actions"):
         with st.spinner("Coletando on-chain e gerando CSVs..."):
             n = collect_and_score_now()
         if n > 0:
@@ -399,13 +400,14 @@ if show_contrib:
 
 # PDF
 st.markdown('<div class="section-title">Relatório (PDF)</div>', unsafe_allow_html=True)
-if st.button("🧾 Gerar PDF de críticos"):
+# >>> chave única para o botão de PDF
+if st.button("🧾 Gerar PDF de críticos", key="pdf_button"):
     base_df = df if use_filters else (df_all[df_all["chain"] == chain] if "chain" in df_all.columns else df_all)
     crit = base_df[base_df["score"] < alert_input].copy()
     try:
         pdf_bytes = generate_pdf_bytes(crit, alert_input, f"{fname} | chain={chain} | filtros={'on' if use_filters else 'off'}")
         st.success("PDF gerado com sucesso! Use o botão para baixar.", icon="✅")
-        st.download_button("⬇️ Baixar PDF", data=pdf_bytes, file_name="relatorio_criticos.pdf", mime="application/pdf", use_container_width=True)
+        st.download_button("⬇️ Baixar PDF", data=pdf_bytes, file_name="relatorio_criticos.pdf", mime="application/pdf", use_container_width=True, key="pdf_download")
     except Exception as e:
         st.error(f"Falha ao gerar PDF: {e}", icon="⚠️")
 st.markdown(f"""<div class="explain">💡 O PDF lista transações com score abaixo do limiar.</div>""", unsafe_allow_html=True)

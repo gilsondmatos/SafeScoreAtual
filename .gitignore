@@ -1,0 +1,64 @@
+# -------- Python base --------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+.pytype/
+.mypy_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+.ruff_cache/
+
+# -------- Ambientes virtuais --------
+.venv/
+venv/
+env/
+ENV/
+
+# -------- Sistema / Editor --------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+*.log
+
+# -------- Variáveis e segredos --------
+.env
+.env.*
+# Streamlit secrets (usar área de Secrets no Cloud)
+.streamlit/secrets.toml
+
+# -------- Streamlit / App --------
+# Arquivos de dados gerados em runtime
+app/data/*.csv
+app/data/*.pdf
+app/data/token_cache.json
+app/data/last_eth_meta.json
+
+# Manter listas e sentinel sob controle de versão
+!app/data/blacklist.csv
+!app/data/watchlist.csv
+!app/data/known_addresses.csv
+!app/data/.gitkeep
+
+# -------- Notebooks --------
+.ipynb_checkpoints/
+
+# -------- Docker / Container (opcional) --------
+*.tar
+*.bak
+
+# -------- Docs geradas (opcional) --------
+docs/**/pitch.pdf

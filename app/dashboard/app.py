@@ -1,6 +1,6 @@
+# app.py
 import os
 import json
-import math
 from datetime import datetime
 from pathlib import Path
 
@@ -8,24 +8,27 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-DATA_DIR = Path("app/data")
-st.set_page_config(page_title="SafeScore Dashboard", layout="wide")
+from eth_collector import collect_eth
+from mock_collector import collect_mock
 
+# ----------------- Configuração -----------------
+st.set_page_config(page_title="SafeScore Dashboard", layout="wide")
+DATA_DIR = Path("app/data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# ----------------- Funções utilitárias -----------------
 def list_csvs():
     files = sorted(DATA_DIR.glob("transactions*.csv"))
     return [f.name for f in files]
 
 def pick_default_csv(files):
-    # Preferir arquivo diário da ETH se existir
     today = datetime.now().strftime("%Y%m%d")
     preferred = f"transactions_eth_{today}.csv"
     if preferred in files:
         return preferred
-    # fallback: qualquer transactions_eth*.csv mais recente
     eth_files = [f for f in files if f.startswith("transactions_eth_")]
     if eth_files:
         return sorted(eth_files)[-1]
-    # fallback geral
     if files:
         return files[-1]
     return None
@@ -35,13 +38,12 @@ def load_csv(fname):
     if not path.exists():
         return pd.DataFrame()
     df = pd.read_csv(path, dtype=str)
-    # normalizar tipos básicos (suave)
     for col in ("amount","score","penalty_total","velocity_last_window"):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     if "timestamp" in df.columns:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    # parse explain -> contrib_pct
+
     if "explain" in df.columns:
         def parse_contrib(x):
             try:
@@ -56,7 +58,7 @@ def kpi(label, value):
     st.metric(label, value)
 
 def bar_chart_token(df):
-    if df.empty:
+    if df.empty or "token" not in df.columns:
         return
     c = (
         alt.Chart(df)
@@ -69,7 +71,6 @@ def bar_chart_token(df):
 def contrib_table(df):
     if df.empty or "contrib_pct" not in df.columns:
         return pd.DataFrame()
-    # explode em linhas chave/valor
     rows = []
     for _, r in df.iterrows():
         c = r["contrib_pct"] or {}
@@ -79,23 +80,48 @@ def contrib_table(df):
         return pd.DataFrame()
     return pd.DataFrame(rows)
 
-# --------- Sidebar ---------
-st.sidebar.header("Filtros")
+# ----------------- Botão de coleta -----------------
+def run_collect_and_score():
+    try:
+        st.info("Coletando transações reais da Ethereum...")
+        fpath = collect_eth(DATA_DIR)
+        return fpath
+    except Exception as e:
+        st.error(f"Coleta Ethereum falhou: {e}. Usando dados mock.")
+        return collect_mock(DATA_DIR)
+
+# ----------------- Layout principal -----------------
+st.title("🔎 SafeScore — Dashboard")
+st.caption(f"Diretório de dados: {DATA_DIR}")
 
 files = list_csvs()
-if not files:
-    st.info("Nenhum CSV encontrado em app/data. Rode `python main.py`.")
-    st.stop()
 
+# Caso inicial: nenhum CSV ainda
+if not files:
+    st.warning("Nenhum CSV encontrado em app/data. Clique abaixo para coletar dados.")
+    if st.button("⚡ Coletar agora (Ethereum)", key="collect_main"):
+        fpath = run_collect_and_score()
+        if fpath:
+            st.success(f"Coleta concluída: {fpath.name}")
+            files = list_csvs()
+        else:
+            st.stop()
+    else:
+        st.stop()
+
+# Seleção de arquivo
 default_file = pick_default_csv(files)
-fname = st.sidebar.selectbox("Arquivo de transações", files, index=files.index(default_file) if default_file in files else 0)
+fname = st.sidebar.selectbox(
+    "Arquivo de transações", files, 
+    index=files.index(default_file) if default_file in files else 0
+)
 
 df_all = load_csv(fname)
 if df_all.empty:
-    st.warning("Arquivo vazio.")
+    st.error("Arquivo vazio.")
     st.stop()
 
-# Filtro por chain (padrão: ETH)
+# Filtro por chain
 available_chains = sorted(df_all["chain"].dropna().unique()) if "chain" in df_all.columns else ["ETH"]
 default_chain = os.getenv("DASHBOARD_DEFAULT_CHAIN", "ETH")
 default_chain_idx = available_chains.index(default_chain) if default_chain in available_chains else 0
@@ -120,7 +146,6 @@ if addr_filter:
 df = df[(df["score"] >= score_min) & (df["score"] <= score_max)]
 
 # --------- KPIs ---------
-st.title("🔎 SafeScore — Antifraude")
 cols = st.columns(3)
 with cols[0]:
     kpi("Transações (filtro)", len(df))
@@ -132,11 +157,6 @@ with cols[2]:
     except Exception:
         t = 50
     kpi("Críticas (< limiar)", int((df["score"] < t).sum()))
-
-# --------- Parâmetros ---------
-st.sidebar.markdown("### Parâmetros")
-alert_input = st.sidebar.number_input("Limiar de alerta (score < x)", min_value=0, max_value=100, value=int(os.getenv("SCORE_ALERT_THRESHOLD", "50")))
-st.sidebar.caption("Dica: ajuste aqui e gere o PDF na seção abaixo.")
 
 # --------- Gráfico por token ---------
 st.subheader("Distribuição por token")

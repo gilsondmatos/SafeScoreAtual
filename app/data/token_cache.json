@@ -1,0 +1,186 @@
+{
+  "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": {
+    "symbol": "USDC",
+    "decimals": 6
+  },
+  "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {
+    "symbol": "WBTC",
+    "decimals": 8
+  },
+  "0x77e06c9eccf2e797fd462a92b6d7642ef85b0a44": {
+    "symbol": "wTAO",
+    "decimals": 9
+  },
+  "0xdd3b11ef34cd511a2da159034a05fcb94d806686": {
+    "symbol": "REKT",
+    "decimals": 18
+  },
+  "0xdac17f958d2ee523a2206206994597c13d831ec7": {
+    "symbol": "USDT",
+    "decimals": 6
+  },
+  "0x033bbde722ea3cdcec73cffea6581df9f9c257de": {
+    "symbol": "VELAR",
+    "decimals": 6
+  },
+  "0xfa2b947eec368f42195f24f36d2af29f7c24cec2": {
+    "symbol": "USDf",
+    "decimals": 18
+  },
+  "0x76b6f7bd8857195c5165a49a6ff75f84a3f081ca": {
+    "symbol": "BLOCKYBOY",
+    "decimals": 9
+  },
+  "0x5a666c7d92e5fa7edcb6390e4efd6d0cdd69cf37": {
+    "symbol": "MARSH",
+    "decimals": 18
+  },
+  "0x7420b4b9a0110cdc71fb720908340c03f9bc03ec": {
+    "symbol": "JASMY",
+    "decimals": 18
+  },
+  "0xb8c14c3d478fed09cbd443ad2581415f33f220ba": {
+    "symbol": "SACKS",
+    "decimals": 18
+  },
+  "0x58b9cb810a68a7f3e1e4f8cb45d1b9b3c79705e8": {
+    "symbol": "CLEAR",
+    "decimals": 18
+  },
+  "0x00c83aecc790e8a4453e5dd3b0b4b3680501a7a7": {
+    "symbol": "SKL",
+    "decimals": 18
+  },
+  "0xc6fd8084fb9b6a0768cf943c341049edd1085b82": {
+    "symbol": "TOKEN",
+    "decimals": 18
+  },
+  "0x6b175474e89094c44da98b954eedeac495271d0f": {
+    "symbol": "DAI",
+    "decimals": 18
+  },
+  "0x4c1746a800d224393fe2470c70a35717ed4ea5f1": {
+    "symbol": "PLUME",
+    "decimals": 18
+  },
+  "0xd0ec028a3d21533fdd200838f39c85b03679285d": {
+    "symbol": "NEWT",
+    "decimals": 18
+  },
+  "0x514910771af9ca656af840dff83e8264ecf986ca": {
+    "symbol": "LINK",
+    "decimals": 18
+  },
+  "0xe0b7ad7f8f26e2b00c8b47b5df370f15f90fcf48": {
+    "symbol": "SOLX",
+    "decimals": 18
+  },
+  "0x961c8c0b1aad0c0b10a51fef6a867e3091bcef17": {
+    "symbol": "DYP",
+    "decimals": 18
+  },
+  "0x906be3780c794bbf9ef16e740f3e047b8d899574": {
+    "symbol": "YOTSUBA",
+    "decimals": 9
+  },
+  "0xac184a7f191295eacfeafb28fe50b6cad4673dfd": {
+    "symbol": "SOLAXY",
+    "decimals": 9
+  },
+  "0x6c3ea9036406852006290770bedfcaba0e23a0e8": {
+    "symbol": "PYUSD",
+    "decimals": 6
+  },
+  "0xcc9e0bd9438ca0056653d134de794abeaff8c676": {
+    "symbol": "LESLIE",
+    "decimals": 9
+  },
+  "0x9995de128a10c537695e45d8df40246bb1588eee": {
+    "symbol": "ETH",
+    "decimals": 9
+  },
+  "0x163f8c2467924be0ae7b5347228cabf260318753": {
+    "symbol": "WLD",
+    "decimals": 18
+  },
+  "0xbe0ed4138121ecfc5c0e56b40517da27e6c5226b": {
+    "symbol": "ATH",
+    "decimals": 18
+  },
+  "0xda57abf95a7c21eb9df08fbaada182f749f6c62f": {
+    "symbol": "PENDLE-LPT",
+    "decimals": 18
+  },
+  "0xb131f4a55907b10d1f0a50d8ab8fa09ec342cd74": {
+    "symbol": "MEME",
+    "decimals": 18
+  },
+  "0x4d3f1960db4ef3159b746c47b69899310b1a299d": {
+    "symbol": "RETARD",
+    "decimals": 18
+  },
+  "0x7beb8f36650e9327d8c52735e3b3c9d1521576e3": {
+    "symbol": "kek",
+    "decimals": 18
+  },
+  "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2": {
+    "symbol": "MKR",
+    "decimals": 18
+  },
+  "0x917cee801a67f933f2e6b33fc0cd1ed2d5909d88": {
+    "symbol": "weETHs",
+    "decimals": 18
+  },
+  "0xea9ccc8076c5f0ce65d0b8a9c7d61957544cd22a": {
+    "symbol": "BULL",
+    "decimals": 18
+  },
+  "0xaccfd598ef801178ed6c816c234b16ec51ae9f32": {
+    "symbol": "SATOSHIT",
+    "decimals": 18
+  },
+  "0xd31a59c85ae9d8edefec411d448f90841571b89c": {
+    "symbol": "SOL",
+    "decimals": 9
+  },
+  "0xc18360217d8f7ab5e7c516566761ea12ce7f9d72": {
+    "symbol": "ENS",
+    "decimals": 18
+  },
+  "0x57e114b691db790c35207b2e685d4a43181e6061": {
+    "symbol": "ENA",
+    "decimals": 18
+  },
+  "0x8ed97a637a790be1feff5e888d43629dc05408f6": {
+    "symbol": "NPC",
+    "decimals": 18
+  },
+  "0x808507121b80c02388fad14726482e061b8da827": {
+    "symbol": "PENDLE",
+    "decimals": 18
+  },
+  "0xccb365d2e11ae4d6d74715c680f56cf58bf4bf10": {
+    "symbol": "WEPE",
+    "decimals": 18
+  },
+  "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9": {
+    "symbol": "AAVE",
+    "decimals": 18
+  },
+  "0x19fa72d9d076668ced11399bae149f916938bd8d": {
+    "symbol": "TOKEN",
+    "decimals": 18
+  },
+  "0xfaba6f8e4a5e8ab82f62fe7c39859fa577269be3": {
+    "symbol": "ONDO",
+    "decimals": 18
+  },
+  "0xed04915c23f00a313a544955524eb7dbd823143d": {
+    "symbol": "ACH",
+    "decimals": 8
+  },
+  "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0": {
+    "symbol": "wstETH",
+    "decimals": 18
+  }
+}

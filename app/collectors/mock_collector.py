@@ -1,5 +1,5 @@
 """
-Gerador mock *sem* Streamlit, para demo/offline.
+Gerador mock sem Streamlit, para demo/offline.
 """
 from __future__ import annotations
 
@@ -8,18 +8,14 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List
 
-
 TOKENS = ["ETH", "USDT", "USDC", "DAI"]
 METHODS = ["TRANSFER", "SWAP", "APPROVE"]
-CHAINS = ["MOCK"]  # explicita
-
 
 def _rand_addr() -> str:
     return "0x" + "".join(random.choices("0123456789abcdef", k=40))
 
-
 def load_input_or_mock(data_dir: Path) -> List[Dict[str, Any]]:
-    random.seed(datetime.now(timezone.utc).strftime("%Y%m%d%H"))  # muda por hora
+    random.seed(datetime.now(timezone.utc).strftime("%Y%m%d%H"))
     now = datetime.now(timezone.utc)
 
     out: List[Dict[str, Any]] = []

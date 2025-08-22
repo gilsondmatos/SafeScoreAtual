@@ -5,7 +5,7 @@ import json
 from typing import Dict, Any, List, Set
 from pathlib import Path
 
-from .rules import RuleContext, DEFAULT_WEIGHTS, get_env_int
+from .rules import RuleContext, DEFAULT_WEIGHTS, get_env_int  # :contentReference[oaicite:0]{index=0}
 
 class ScoreEngine:
     def __init__(
@@ -18,16 +18,13 @@ class ScoreEngine:
         self.prev_transactions = prev_transactions or []
         self.known_addresses = known_addresses or set()
 
-        # Carregar listas
         self.blacklist = self._load_single_col_csv("blacklist.csv")
         self.watchlist = self._load_single_col_csv("watchlist.csv")
         self.sensitive_tokens = self._load_single_col_csv("sensitive_tokens.csv", upper=True)
         self.sensitive_methods = self._load_single_col_csv("sensitive_methods.csv", upper=True)
 
-        # Pesos (permite override via weights.json)
         self.weights = self._load_weights()
 
-        # Parâmetros de regras
         amount_threshold = float(os.getenv("AMOUNT_THRESHOLD", "10000"))
         velocity_window_min = get_env_int("VELOCITY_WINDOW_MIN", 10)
         velocity_max_tx = get_env_int("VELOCITY_MAX_TX", 5)
@@ -53,7 +50,6 @@ class ScoreEngine:
         with p.open("r", encoding="utf-8") as f:
             reader = csv.reader(f)
             header = next(reader, None)
-            # aceita com ou sem header
             if header:
                 for row in reader:
                     if not row: continue
@@ -61,7 +57,6 @@ class ScoreEngine:
                     if not v: continue
                     out.add(v.upper() if upper else v)
             else:
-                # reabrir sem pular primeira linha
                 f.seek(0)
                 for row in csv.reader(f):
                     if not row: continue
@@ -71,7 +66,6 @@ class ScoreEngine:
         return out
 
     def _load_weights(self) -> Dict[str, int]:
-        """Lê app/data/weights.json e faz merge com DEFAULT_WEIGHTS."""
         fp = self.data_dir / "weights.json"
         weights = DEFAULT_WEIGHTS.copy()
         if fp.exists():
@@ -84,20 +78,14 @@ class ScoreEngine:
                     except Exception:
                         pass
             except Exception:
-                # se houver erro, usa apenas DEFAULT_WEIGHTS
                 pass
         return weights
 
     def score_transaction(self, tx: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Score começa em 100 e sofre penalidades por regra.
-        Retorna: { score: int, reasons: [str], hits: {regra: peso}, velocity_last_window: int }
-        """
         score = 100
         hits: Dict[str, int] = {}
         reasons: List[str] = []
 
-        # Regras
         self.ctx.r_blacklist(tx, hits, reasons)
         self.ctx.r_watchlist(tx, hits, reasons)
         self.ctx.r_high_amount(tx, hits, reasons)
@@ -107,12 +95,10 @@ class ScoreEngine:
         self.ctx.r_sensitive_token(tx, hits, reasons)
         self.ctx.r_sensitive_method(tx, hits, reasons)
 
-        # Agregar penalidades
         for _, w in hits.items():
             score -= int(w)
 
-        if score < 0: score = 0
-        if score > 100: score = 100
+        score = max(0, min(100, score))
 
         return {
             "score": int(score),

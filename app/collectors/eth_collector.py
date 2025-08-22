@@ -1,7 +1,6 @@
 """
-Coletor ETH *sem* dependências de Streamlit.
-Tenta ler blocos recentes via JSON-RPC público (sem web3), com fallback para exceção.
-O dashboard captura a exceção e cai no mock automaticamente.
+Coletor ETH sem dependência do web3.py (usa JSON-RPC direto).
+Se falhar, o dashboard cai no mock automaticamente.
 """
 from __future__ import annotations
 
@@ -11,13 +10,11 @@ from typing import Any, Dict, List, Optional
 import time
 import requests
 
-
 def _env_bool(name: str, default: bool) -> bool:
     v = os.getenv(name)
     if v is None:
         return default
     return str(v).strip().lower() in {"1", "true", "yes", "y", "on"}
-
 
 def _rpc_call(url: str, method: str, params: list[Any]) -> Any:
     resp = requests.post(
@@ -31,10 +28,8 @@ def _rpc_call(url: str, method: str, params: list[Any]) -> Any:
         raise RuntimeError(data["error"])
     return data["result"]
 
-
 def _hex_to_int(h: str) -> int:
     return int(h, 16)
-
 
 def _wei_to_eth(wei_hex: str) -> float:
     try:
@@ -43,12 +38,10 @@ def _wei_to_eth(wei_hex: str) -> float:
     except Exception:
         return 0.0
 
-
 def _get_urls() -> List[str]:
     urls = os.getenv("ETH_RPC_URL", "") or ""
     urls = urls.replace(" ", "")
     return [u for u in urls.split(",") if u]
-
 
 def load_from_eth(data_dir: Path) -> List[Dict[str, Any]]:
     urls = _get_urls()
@@ -79,11 +72,10 @@ def load_from_eth(data_dir: Path) -> List[Dict[str, Any]]:
     for b in range(last_block, start - 1, -1):
         if len(out) >= max_tx:
             break
-        # obter bloco com transações
         try:
             blk = _rpc_call(used_url, "eth_getBlockByNumber", [hex(b), True])
-        except Exception as e:
-            # tenta outra URL
+        except Exception:
+            blk = None
             for alt in urls:
                 if alt == used_url:
                     continue
@@ -92,7 +84,7 @@ def load_from_eth(data_dir: Path) -> List[Dict[str, Any]]:
                     used_url = alt
                     break
                 except Exception:
-                    blk = None
+                    pass
             if blk is None:
                 continue
 
@@ -102,12 +94,10 @@ def load_from_eth(data_dir: Path) -> List[Dict[str, Any]]:
         for t in txs:
             if len(out) >= max_tx:
                 break
-            # filtrar ETH nativo
             value_eth = _wei_to_eth(t.get("value", "0x0"))
             if value_eth < min_eth:
                 continue
             if only_erc20:
-                # sem indexador de logs aqui; se usuário insistir, retorna 0 e dashboard cai no mock
                 continue
 
             tx_id = t.get("hash", "")
@@ -126,5 +116,4 @@ def load_from_eth(data_dir: Path) -> List[Dict[str, Any]]:
                 "chain": os.getenv("CHAIN_NAME", "ETH"),
             })
 
-    # se usuário setou ONLY_ERC20=true, este coletor retornará vazio -> dashboard cai no mock
     return out

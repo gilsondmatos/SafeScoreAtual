@@ -1,8 +1,15 @@
-# SafeScore (Challenge FIAP × TecBan)
+# SafeScore
 
-Solução antifraude que calcula **score de risco (0–100)** para transações (mock e/ou on-chain), gera **alertas**, **CSV** e **PDF**, e exibe um **dashboard** no Streamlit.
+Antifraude com score 0–100 para transações on-chain ou mock. Gera CSV, alerta (Telegram) e dashboard em Streamlit.
 
-> **Conceito de score:** começa em **100** e **perde pontos** conforme regras de risco disparam. **Quanto menor o score, mais arriscada é a transação.**  
-> **Alerta/Prevenção:** se `score < SCORE_ALERT_THRESHOLD`, a transação é **crítica** (alerta Telegram e fila de retenção `pending_review.csv`).
+## Rodar local
+```bash
+python -m venv .venv && . .venv/Scripts/activate  # (Windows) ou source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # opcional
 
-## Estrutura
+# Coleta + score + CSV
+python main.py
+
+# Dashboard
+streamlit run app.py

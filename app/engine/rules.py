@@ -46,8 +46,6 @@ class RuleContext:
         self.velocity_window_min = velocity_window_min
         self.velocity_max_tx = velocity_max_tx
 
-    # --- Regras ---
-
     def r_blacklist(self, tx: Dict[str, Any], hits: Dict[str, int], reasons: List[str]):
         w = self.weights.get("blacklist", 0)
         if not w: return
@@ -82,7 +80,6 @@ class RuleContext:
         if not w: return
         ts = tx.get("timestamp") or ""
         try:
-            # aceitar ISO com/sem timezone; padrão: UTC
             if ts.endswith("Z"):
                 dt = datetime.fromisoformat(ts.replace("Z","+00:00"))
             else:
@@ -92,7 +89,6 @@ class RuleContext:
             hour = dt.hour
         except Exception:
             hour = 0
-        # Janela incomum: 00:00–06:00 (ajuste aqui se necessário)
         if hour < 6:
             hits["unusual_hour"] = w
             reasons.append("Horário incomum (madrugada)")
@@ -106,9 +102,6 @@ class RuleContext:
             reasons.append("Endereço remetente novo")
 
     def r_velocity(self, tx: Dict[str, Any], hits: Dict[str, int], reasons: List[str]) -> int:
-        """
-        Retorna contagem da janela p/ consumo externo (telemetria).
-        """
         w = self.weights.get("velocity", 0)
         if not w: return 0
         a = (tx.get("from_address","") or "").lower()
@@ -138,7 +131,7 @@ class RuleContext:
                         pdt = pdt.replace(tzinfo=timezone.utc)
             except Exception:
                 continue
-            if pdt >= window_start and pdt <= now_dt:
+            if window_start <= pdt <= now_dt:
                 count += 1
 
         if count >= int(self.velocity_max_tx):

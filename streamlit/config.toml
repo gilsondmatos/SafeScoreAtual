@@ -1,11 +1,2 @@
-[server]
-headless = true
-port = 8501
-address = "0.0.0.0"
-enableCORS = false
-
 [theme]
 base="dark"
-primaryColor="#22D3EE"
-secondaryBackgroundColor="#0B1220"
-textColor="#E5F5FF"

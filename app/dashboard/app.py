@@ -295,20 +295,39 @@ st.sidebar.header("Filtros")
 apply_secrets_to_env()
 ensure_data_dir()
 
+# --- chaves únicas e estáveis por sessão ---
+import uuid
+if "_collect_top_key" not in st.session_state:
+    st.session_state["_collect_top_key"] = f"collect_top_{uuid.uuid4().hex}"
+if "_collect_actions_key" not in st.session_state:
+    st.session_state["_collect_actions_key"] = f"collect_actions_{uuid.uuid4().hex}"
+if "_pdf_button_key" not in st.session_state:
+    st.session_state["_pdf_button_key"] = f"pdf_button_{uuid.uuid4().hex}"
+if "_pdf_download_key" not in st.session_state:
+    st.session_state["_pdf_download_key"] = f"pdf_download_{uuid.uuid4().hex}"
+
 files = list_csvs()
+
+# ---------- EMPTY STATE (sem CSV) COM GUARDA ----------
 if not files:
-    st.warning("Nenhum CSV encontrado em app/data.")
-    # >>> chave única para o botão superior
-    if st.button("⚡ Coletar agora (ETH)", key="collect_top"):
-        with st.spinner("Coletando on-chain e gerando CSVs..."):
-            n = collect_and_score_now()
-        if n > 0:
-            st.success(f"Coleta concluída ({n} transações). Recarregando…")
-            st.rerun()
-        else:
-            st.error("Não foi possível coletar dados agora. Confira as secrets (ETH_RPC_URL etc.).")
+    # evita render duplicado do mesmo bloco se o script for avaliado mais de uma vez
+    first_render = not st.session_state.get("_empty_rendered", False)
+    if first_render:
+        st.session_state["_empty_rendered"] = True
+        st.warning("Nenhum CSV encontrado em app/data.")
+        if st.button("⚡ Coletar agora (ETH)", key=st.session_state["_collect_top_key"]):
+            with st.spinner("Coletando on-chain e gerando CSVs..."):
+                n = collect_and_score_now()
+            if n > 0:
+                st.success(f"Coleta concluída ({n} transações). Recarregando…")
+                st.rerun()
+            else:
+                st.error("Não foi possível coletar dados agora. Confira as secrets (ETH_RPC_URL etc.).")
+    # mesmo que este bloco seja chamado mais de uma vez na mesma execução,
+    # não criaremos o botão novamente, evitando conflito de chaves
     st.stop()
 
+# ------- a partir daqui há CSV; segue fluxo normal -------
 default_file = pick_default_csv(files)
 fname = st.sidebar.selectbox("Arquivo de transações", files, index=files.index(default_file) if default_file in files else 0)
 
@@ -316,27 +335,6 @@ df_all = load_csv(fname)
 if df_all.empty:
     st.warning("Arquivo vazio.")
     st.stop()
-
-available_chains = sorted(df_all["chain"].dropna().unique()) if "chain" in df_all.columns else ["ETH"]
-default_chain = os.getenv("DASHBOARD_DEFAULT_CHAIN", "ETH")
-default_chain_idx = available_chains.index(default_chain) if default_chain in available_chains else 0
-chain = st.sidebar.selectbox("Fonte (chain)", available_chains, index=default_chain_idx)
-
-df = df_all[df_all["chain"] == chain] if "chain" in df_all.columns else df_all.copy()
-
-tokens = ["(todos)"] + sorted([t for t in df["token"].dropna().unique()]) if "token" in df.columns else ["(todos)"]
-ftoken = st.sidebar.selectbox("Token", tokens, index=0)
-addr_filter = st.sidebar.text_input("Filtro por endereço (contém)")
-score_min, score_max = st.sidebar.slider("Faixa de score", 0, 100, (0, 100))
-show_contrib = st.sidebar.checkbox("Mostrar contribuição por regra (%)", value=True)
-
-if ftoken != "(todos)":
-    df = df[df["token"] == ftoken]
-if addr_filter:
-    m = df["from_address"].astype(str).str.contains(addr_filter, case=False, na=False) | \
-        df["to_address"].astype(str).str.contains(addr_filter, case=False, na=False)
-    df = df[m]
-df = df[(df["score"] >= score_min) & (df["score"] <= score_max)]
 
 # Cabeçalho
 st.title("🔎 SafeScore — Antifraude")
@@ -358,23 +356,15 @@ with c4: kpi("Tokens distintos", df["token"].nunique() if "token" in df.columns 
 st.markdown(f"""<div class="explain">💡 KPIs resumem a visão atual do recorte.</div>""", unsafe_allow_html=True)
 
 # Parâmetros & Ações
-st.markdown('<div class="section-title">Parâmetros & Ações</div>', unsafe_allow_html=True)
-ac1, ac2, ac3 = st.columns([2, 2, 2])
-with ac1:
-    alert_input = st.number_input("Limiar de alerta (score < x)", min_value=0, max_value=100, value=int(os.getenv("SCORE_ALERT_THRESHOLD", "50")))
-with ac2:
-    use_filters = st.checkbox("Gerar PDF usando filtros atuais", value=True)
-with ac3:
-    # >>> chave única diferente do botão superior
-    if st.button("⚡ Coletar agora (ETH)", key="collect_actions"):
-        with st.spinner("Coletando on-chain e gerando CSVs..."):
-            n = collect_and_score_now()
-        if n > 0:
-            st.success(f"Coleta concluída ({n} transações). Recarregando…")
-            st.rerun()
-        else:
-            st.error("Não foi possível coletar dados agora. Confira as secrets (ETH_RPC_URL etc.).")
-st.markdown(f"""<div class="explain">💡 Clique em <b>Coletar agora (ETH)</b> para popular rapidamente o painel neste container efêmero.</div>""", unsafe_allow_html=True)
+if st.button("⚡ Coletar agora (ETH)", key=st.session_state["_collect_actions_key"]):
+    with st.spinner("Coletando on-chain e gerando CSVs..."):
+        n = collect_and_score_now()
+    if n > 0:
+        st.success(f"Coleta concluída ({n} transações). Recarregando…")
+        st.rerun()
+    else:
+        st.error("Não foi possível coletar dados agora. Confira as secrets (ETH_RPC_URL etc.).")
+
 
 # Gráfico
 st.markdown('<div class="section-title">Distribuição por token</div>', unsafe_allow_html=True)
@@ -399,15 +389,19 @@ if show_contrib:
     st.markdown(f"""<div class="explain">💡 Percentual de participação de cada regra na penalidade total.</div>""", unsafe_allow_html=True)
 
 # PDF
-st.markdown('<div class="section-title">Relatório (PDF)</div>', unsafe_allow_html=True)
-# >>> chave única para o botão de PDF
-if st.button("🧾 Gerar PDF de críticos", key="pdf_button"):
+if st.button("🧾 Gerar PDF de críticos", key=st.session_state["_pdf_button_key"]):
     base_df = df if use_filters else (df_all[df_all["chain"] == chain] if "chain" in df_all.columns else df_all)
     crit = base_df[base_df["score"] < alert_input].copy()
     try:
         pdf_bytes = generate_pdf_bytes(crit, alert_input, f"{fname} | chain={chain} | filtros={'on' if use_filters else 'off'}")
         st.success("PDF gerado com sucesso! Use o botão para baixar.", icon="✅")
-        st.download_button("⬇️ Baixar PDF", data=pdf_bytes, file_name="relatorio_criticos.pdf", mime="application/pdf", use_container_width=True, key="pdf_download")
+        st.download_button(
+            "⬇️ Baixar PDF",
+            data=pdf_bytes,
+            file_name="relatorio_criticos.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key=st.session_state["_pdf_download_key"],
+        )
     except Exception as e:
         st.error(f"Falha ao gerar PDF: {e}", icon="⚠️")
-st.markdown(f"""<div class="explain">💡 O PDF lista transações com score abaixo do limiar.</div>""", unsafe_allow_html=True)

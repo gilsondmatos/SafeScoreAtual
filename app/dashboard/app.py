@@ -8,17 +8,23 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-# PDF (fallback simples)
+# PDF (opcional, fallback simples)
 try:
     from fpdf import FPDF  # type: ignore
 except Exception:
     FPDF = None  # type: ignore
 
 DATA_DIR = Path("app/data")
-st.set_page_config(page_title="SafeScore Dashboard", layout="wide")
+
+# ---- PROTEÇÃO: só configurar a página 1x por sessão e como 1º comando do Streamlit
+if "_cfg_done" not in st.session_state:
+    try:
+        st.set_page_config(page_title="SafeScore — Dashboard", layout="wide")
+    finally:
+        st.session_state["_cfg_done"] = True
 
 
-# ----------------- HELPERS BÁSICOS -----------------
+# ----------------- HELPERS -----------------
 def apply_secrets_to_env() -> None:
     """Carrega st.secrets (Streamlit Cloud) para o ambiente, se ainda não existir."""
     try:
@@ -27,7 +33,6 @@ def apply_secrets_to_env() -> None:
                 continue
             os.environ.setdefault(str(k), str(v))
     except Exception:
-        # rodando local sem secrets
         pass
 
 
@@ -36,21 +41,17 @@ def ensure_data_dir() -> None:
 
 
 def list_csvs() -> List[str]:
-    files = sorted(DATA_DIR.glob("transactions*.csv"))
-    return [f.name for f in files]
+    return sorted([f.name for f in DATA_DIR.glob("transactions*.csv")])
 
 
 def pick_default_csv(files: List[str]) -> str | None:
-    # Preferir diário ETH
     today = datetime.now().strftime("%Y%m%d")
     preferred = f"transactions_eth_{today}.csv"
     if preferred in files:
         return preferred
-    # fallback: transactions_eth mais recente
     eth_files = [f for f in files if f.startswith("transactions_eth_")]
     if eth_files:
         return sorted(eth_files)[-1]
-    # fallback geral
     return files[-1] if files else None
 
 
@@ -59,13 +60,11 @@ def load_csv(fname: str) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     df = pd.read_csv(path, dtype=str)
-    # normalizar tipos
     for col in ("amount", "score", "penalty_total", "velocity_last_window"):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     if "timestamp" in df.columns:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    # parse explain -> contrib_pct
     if "explain" in df.columns:
         def parse_contrib(x):
             try:
@@ -105,7 +104,7 @@ def contrib_table(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
-# ----------------- COLETA INLINE (ETH -> fallback mock) -----------------
+# ----------------- COLETA INLINE -----------------
 def _write_rows(path: Path, rows: List[Dict[str, Any]], header: List[str]) -> None:
     exists = path.exists()
     import csv
@@ -118,24 +117,24 @@ def _write_rows(path: Path, rows: List[Dict[str, Any]], header: List[str]) -> No
 
 
 def collect_and_score_now() -> int:
-    """Coleta dados (ETH, fallback mock), pontua e grava CSVs. Retorna N processados."""
+    """Coleta dados (ETH -> fallback mock), pontua e grava CSVs. Retorna N processados."""
     apply_secrets_to_env()
     ensure_data_dir()
 
     txs: List[Dict[str, Any]] = []
     chain_label = os.getenv("CHAIN_NAME", "ETH")
 
-    # tentar ETH
+    # 1) tentar ETH
     try:
         import importlib
-        ec = importlib.import_module("app.collectors.eth_collector")
+        ec = importlib.import_module("app.collectors.eth_collector")  # sem streamlit
         txs = getattr(ec, "load_from_eth")(DATA_DIR)
     except Exception as e:
         st.warning(f"Coletor ETH falhou: {e}. Usando dados mock.")
-        # fallback mock
+        # 2) fallback mock
         try:
             import importlib
-            mc = importlib.import_module("app.collectors.mock_collector")
+            mc = importlib.import_module("app.collectors.mock_collector")  # sem streamlit
             txs = getattr(mc, "load_input_or_mock")(DATA_DIR)
             chain_label = "MOCK"
         except Exception as e2:
@@ -145,7 +144,7 @@ def collect_and_score_now() -> int:
     if not txs:
         return 0
 
-    # scoring
+    # 3) scoring
     from app.engine.scoring import ScoreEngine
     prev_path = DATA_DIR / "transactions.csv"
     prev = []
@@ -191,7 +190,7 @@ def collect_and_score_now() -> int:
     return len(out_rows)
 
 
-# ----------------- PDF (simples) -----------------
+# ----------------- PDF -----------------
 def _pdf_from_rows(rows: pd.DataFrame, threshold: int, context_title: str) -> bytes:
     if FPDF is None:
         raise RuntimeError("FPDF não instalado")
@@ -242,7 +241,6 @@ def _pdf_from_rows(rows: pd.DataFrame, threshold: int, context_title: str) -> by
 
 
 def generate_pdf_bytes(df_source: pd.DataFrame, threshold: int, context_title: str) -> bytes:
-    # Preferir gerar_relatorio.py se existir
     try:
         import importlib
         gr = importlib.import_module("gerar_relatorio")
@@ -258,8 +256,6 @@ apply_secrets_to_env()
 ensure_data_dir()
 
 st.title("SafeScore — Dashboard")
-
-# Ação principal (um único botão de coleta)
 col_a, col_b = st.columns([4, 1])
 with col_a:
     st.caption(f"Diretório de dados: {DATA_DIR.resolve()}")
@@ -278,9 +274,8 @@ if not files:
     st.info("Nenhum CSV encontrado em app/data. Use o botão acima ou rode `python main.py` localmente.")
     st.stop()
 
-# --------- Sidebar / Filtros ---------
+# --------- Filtros (sidebar) ---------
 st.sidebar.header("Filtros")
-
 default_file = pick_default_csv(files)
 fname = st.sidebar.selectbox("Arquivo de transações", files, index=files.index(default_file) if default_file in files else 0)
 
@@ -298,7 +293,6 @@ df = df_all[df_all["chain"] == chain] if "chain" in df_all.columns else df_all.c
 
 tokens = ["(todos)"] + sorted([t for t in df["token"].dropna().unique()]) if "token" in df.columns else ["(todos)"]
 ftoken = st.sidebar.selectbox("Token", tokens, index=0)
-
 addr_filter = st.sidebar.text_input("Filtro por endereço (contém)")
 score_min, score_max = st.sidebar.slider("Faixa de score", 0, 100, (0, 100))
 show_contrib = st.sidebar.checkbox("Mostrar contribuição por regra (%)", value=True)
@@ -324,7 +318,7 @@ with cols[2]:
         t_env = 50
     kpi("Críticas (< limiar env)", int((df["score"] < t_env).sum()))
 
-# --------- Parâmetros p/ PDF ---------
+# --------- PDF ---------
 st.subheader("Relatório (PDF)")
 alert_input = st.number_input("Limiar de alerta (score < x)", min_value=0, max_value=100, value=t_env)
 use_filters = st.checkbox("Usar filtros atuais no PDF", value=True)
@@ -338,17 +332,17 @@ if st.button("Gerar PDF de críticos", key="pdf_button"):
     except Exception as e:
         st.error(f"Falha ao gerar PDF: {e}")
 
-# --------- Gráfico por token ---------
+# --------- Gráfico ---------
 st.subheader("Distribuição por token")
 bar_chart_token(df)
 
-# --------- Tabela principal ---------
+# --------- Tabela ---------
 st.subheader("Transações")
 cols_show = ["tx_id","timestamp","from_address","to_address","amount","token","method","chain","score","penalty_total"]
 cols_show = [c for c in cols_show if c in df.columns]
 st.dataframe(df[cols_show].sort_values(by="timestamp", ascending=False), use_container_width=True, height=420)
 
-# --------- Contribuição por regra ---------
+# --------- Contribuição ---------
 if show_contrib:
     st.subheader("Contribuição por regra (%)")
     ctab = contrib_table(df)
